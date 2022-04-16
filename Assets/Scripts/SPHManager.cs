@@ -1,13 +1,20 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Random = UnityEngine.Random;
 using System.Runtime.InteropServices;
+
 
 
 
 public class SPHManager : MonoBehaviour
 {
+    public struct Particle
+    {
+        public Vector3 position;
+
+        public Vector4 colorGradient;
+    }
+
     [SerializeField]
     [Header("Particle properties")]
     public float radius = 2f;
@@ -15,15 +22,12 @@ public class SPHManager : MonoBehaviour
     Transform pointPrefab;
     public float particleRenderSize = 1f;
     public Material material;
-    public float mass = 4f;
+    public float mass = 1f;
     public float gasConstant = 2000f;
-    public float restDensity = 9f;
-    //粘性
-    public float viscosityCoefficient = 2.5f;
-    public float[] gravity = { 0.0f, -9.81f * 2000f, 0.0f };
-    //阻尼
-    [SerializeField, Range(-0.99f, 0)]
-    public float damping = -0.37f;
+    public float restDensity = 2f;
+    public float viscosityCoefficient = 1.2f;
+    public float[] gravity = { 0.0f, -9.81f, 0.0f };
+    public float damping = -0.5f;
     public float dt = 0.01f;
 
     private float volume;
@@ -50,7 +54,6 @@ public class SPHManager : MonoBehaviour
 
     private int[] _neighbourList;
     private uint[] _hashGrid;
-    private uint[] _hashGridTracker;
     private float[] _densities;
     private float[] _pressures;
     private Vector3[] _velocities;
@@ -68,7 +71,6 @@ public class SPHManager : MonoBehaviour
     private ComputeBuffer _forcesBuffer;
     private static readonly int SizeProperty = Shader.PropertyToID("_size");
     private static readonly int ParticlesBufferProperty = Shader.PropertyToID("_particlesBuffer");
-    //private static readonly int VelocityField = Shader.PropertyToID("_velocitiesBuffer");
 
     public ComputeShader computeShaderSPH;
     private int clearHashGridKernel;
@@ -77,65 +79,11 @@ public class SPHManager : MonoBehaviour
     private int computeDensityPressureKernel;
     private int computeForcesKernel;
     private int integrateKernel;
-    private int DispatchKernel;
-
-    [Tooltip("The absolute accumulated simulation steps")]
-    public int elapsedSimulationSteps;
-    private object properties;
-
-    [StructLayout(LayoutKind.Sequential, Size = 28)]
-    //private struct Particle
-    //{
-    //    public float mass;
-    //    public Vector3 position;
-    //    public Vector4 colorGradient;
-    //    public Vector3 velocity;
-    //    public int onSurface;
-    //    public float inv_density;
-
-    //    public Vector3 midVelocity;
-    //    public Vector3 prevVelocity;
-    //    public float pressure;
-    //    public Vector3 forcePressure;
-    //    public Vector3 forceViscosity;
-
-    //    public int cellIdx1d;
-    //    public Vector3 forceTension;
-
-
-
-    //    //public Particle(float mass, float inv_density, Vector3 position)
-    //    //{
-    //    //    this.mass = mass;
-    //    //    this.inv_density = inv_density;
-    //    //    this.position = position;
-    //    //    this.colorGradient = Color.white;
-    //    //    this.velocity = Vector3.zero;
-    //    //    this.onSurface = 0;
-    //    //    this.midVelocity = Vector3.zero;
-    //    //    this.prevVelocity = Vector3.zero;
-    //    //    this.pressure = 0f;
-    //    //    this.forcePressure = Vector3.zero;
-    //    //    this.forceViscosity = Vector3.zero;
-    //    //    this.forceTension = Vector3.zero;
-    //    //    this.cellIdx1d = 0;
-    //    //}
-
-    //    public static int stride = sizeof(float) * 28 + sizeof(int) * 2;
-    //}
-    private struct Particle
-    {
-        //public float mass;
-        public Vector3 position;
-
-        public Vector4 colorGradient;
-
-    }
-
 
 
     private void Awake()
     {
+        Application.targetFrameRate = 60;
         radius2 = radius * radius;
         radius3 = radius * radius2;
         radius4 = radius2 * radius2;
@@ -146,7 +94,6 @@ public class SPHManager : MonoBehaviour
         FindKernels();
         InitComputeShader();
         InitComputeBuffers();
-        //FindKernels();
 
     }
 
@@ -168,10 +115,9 @@ public class SPHManager : MonoBehaviour
             for (int x = 0; x < particlesPerDimension; x++)
                 for (int y = 0; y < particlesPerDimension; y++)
                     for (int z = 0; z < particlesPerDimension; z++)
-                    {//ToDo 开放参数初始化
+                    {
                         Vector3 startPos = new Vector3(dimensions - 1, dimensions - 1, dimensions - 1)
                             - new Vector3(x / 2f, y / 2f, z / 2f) - new Vector3(Random.Range(0, 0.01f), Random.Range(0f, 0.01f), Random.Range(0f, 0.01f));
-
 
                         _particles[counter] = new Particle
                         {
@@ -182,16 +128,12 @@ public class SPHManager : MonoBehaviour
                         _pressures[counter] = 0.0f;
                         _forces[counter] = Vector3.zero;
                         _velocities[counter] = Vector3.down * 50;
-
                         if (++counter == numberOfParticles)
                         {
                             return;
                         }
                     }
         }
-
-
-
 
     }
 
@@ -203,13 +145,8 @@ public class SPHManager : MonoBehaviour
         computeDensityPressureKernel = computeShaderSPH.FindKernel("ComputeDensityPressure");
         computeForcesKernel = computeShaderSPH.FindKernel("ComputeForces");
         integrateKernel = computeShaderSPH.FindKernel("Integrate");
-        // DispatchKernel = computeShaderSPH.FindKernel("DrawMesh");
 
     }
-
-
-
-    // Start is called before the first frame update
     private void InitComputeShader()
     {
         computeShaderSPH.SetFloat("CellSize", radius * 2);
@@ -244,10 +181,8 @@ public class SPHManager : MonoBehaviour
         particleMesh.GetBaseVertex(0),
         0
         };
-        //？？？
         _argsBuffer = new ComputeBuffer(1, args.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
         _argsBuffer.SetData(args);
-        //particleBuffer
         _particlesBuffer = new ComputeBuffer(numberOfParticles, sizeof(float) * (3 + 4));
         _particlesBuffer.SetData(_particles);
 
@@ -256,7 +191,6 @@ public class SPHManager : MonoBehaviour
         _neighbourTracker = new int[numberOfParticles];
 
         _hashGrid = new uint[dimensions * dimensions * dimensions * maximumParticlesPerCell];
-        _hashGridTracker = new uint[dimensions * dimensions * dimensions];
 
         _neighbourListBuffer = new ComputeBuffer(numberOfParticles * maximumParticlesPerCell * 8, sizeof(int));
         _neighbourListBuffer.SetData(_neighbourList);
@@ -266,9 +200,7 @@ public class SPHManager : MonoBehaviour
         _hashGridBuffer = new ComputeBuffer(dimensions * dimensions * dimensions * maximumParticlesPerCell, sizeof(uint));
         _hashGridBuffer.SetData(_hashGrid);
         _hashGridTrackerBuffer = new ComputeBuffer(dimensions * dimensions * dimensions, sizeof(uint));
-        //TODO CS.stride直接设置
 
-        //_particlesBuffer = new ComputeBuffer(numberOfParticles, Particle.stride);
         _densitiesBuffer = new ComputeBuffer(numberOfParticles, sizeof(float));
         _densitiesBuffer.SetData(_densities);
         _pressuresBuffer = new ComputeBuffer(numberOfParticles, sizeof(float));
@@ -278,7 +210,6 @@ public class SPHManager : MonoBehaviour
         _velocitiesBuffer.SetData(_velocities);
         _forcesBuffer = new ComputeBuffer(numberOfParticles, sizeof(float) * 3);
         _forcesBuffer.SetData(_forces);
-        //
 
         computeShaderSPH.SetBuffer(clearHashGridKernel, "_hashGridTracker", _hashGridTrackerBuffer);
 
@@ -317,65 +248,24 @@ public class SPHManager : MonoBehaviour
     }
 
     #endregion
-    // Update is called once per frame
-    void Update()
+    // do not use fixed update
+    private void Update()
     {
-
         computeShaderSPH.Dispatch(clearHashGridKernel, dimensions * dimensions * dimensions / 100, 1, 1);
         computeShaderSPH.Dispatch(recalculateHashGridKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(buildNeighbourListKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(computeDensityPressureKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(computeForcesKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(integrateKernel, numberOfParticles / 100, 1, 1);
-
-
-        Debug.Log(_argsBuffer);
-        //if (material != null && particleMesh != null)
-        //{
-        // Vector3[] data = new Vector3[numberOfParticles];
-        // _velocitiesBuffer.GetData(data);
-        //Particle[] dataposition = new Particle[numberOfParticles];
-        // _particlesBuffer.GetData(dataposition);
-        // float[] pressureforce = new float[numberOfParticles];
-        // _pressuresBuffer.GetData(pressureforce);
-        // float[] densities = new float[numberOfParticles];
-        // _densitiesBuffer.GetData(densities);
-
-
-        // Vector3[] forces = new Vector3[numberOfParticles];
-        //_velocitiesBuffer.GetData(forces);
-
-
-
-
-        // for (int i = 0; i <Mathf.CeilToInt(numberOfParticles/100); i++)
-        // {
-        //if (pressureforce[i] > 1000|| pressureforce[i] < -1000){
-        //Debug.Log(i+"number Pressure = " + pressureforce[i]);
-        //}
-        // Debug.Log("elapsedSimulationSteps = " +elapsedSimulationSteps+ ";Velocity = " + data[i]);
-        //Debug.Log("Position = " + dataposition[i].position);
-
-        // Debug.Log(i+"Densities = " + densities[i]);
-        //   Debug.Log("forces = " + forces[i]);
-        //}
         material.SetFloat(SizeProperty, particleRenderSize);
         material.SetBuffer(ParticlesBufferProperty, _particlesBuffer);
-        //material.SetBuffer(VelocityField, _velocitiesBuffer);
         Graphics.DrawMeshInstancedIndirect(particleMesh, 0, material, new Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f)), _argsBuffer);
-        elapsedSimulationSteps++;
-        //}
     }
 
 
     private void OnDestroy()
     {
-        ReleaseBuffers();
-
-    }
-
-    private void ReleaseBuffers()
-    {
+        // release buffers
         _particlesBuffer.Dispose();
         _argsBuffer.Dispose();
         _neighbourListBuffer.Dispose();
