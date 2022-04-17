@@ -288,27 +288,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5a60d7aac1b298e459254441912af982, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  computeShaderSPH: {fileID: 7200000, guid: e6498553575f8e246b6cd03879f2f654, type: 3}
   radius: 2
   particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
   particleRenderSize: 1
-  material: {fileID: 2100000, guid: 6747a84de8c99b349af0036f99f05856, type: 2}
+  particleMaterial: {fileID: 2100000, guid: 6747a84de8c99b349af0036f99f05856, type: 2}
+  numberOfParticles: 80000
+  dimensions: 50
+  stiffness: 0.2
   mass: 1
   gasConstant: 2000
   restDensity: 2
   viscosityCoefficient: 1.2
-  gravity:
-  - 0
-  - -9.8
-  - 0
   damping: -0.5
   dt: 0.01
-  stiffness: 0.2
-  numberOfParticles: 40000
-  dimensions: 50
-  maximumParticlesPerCell: 300
-  _neighbourTracker: 
-  computeShaderSPH: {fileID: 7200000, guid: e6498553575f8e246b6cd03879f2f654, type: 3}
-  elapsedSimulationSteps: 0
+  maximumParticlesPerCell: 200
 --- !u!1 &1621113095
 GameObject:
   m_ObjectHideFlags: 0
