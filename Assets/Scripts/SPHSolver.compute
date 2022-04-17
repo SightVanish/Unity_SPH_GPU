@@ -8,38 +8,13 @@
 #pragma kernel Integrate
 // #pragma enable_d3d11_debug_symbols
 
-float CellSize;
-int Dimensions;
-
-int3 GetCell(float3 position) {
-    return int3(position.x / CellSize, position.y / CellSize, position.z / CellSize);
-
-}
-int GetGridCellIndex(float3 position) {
-    int3 Cellposition = int3(position.x / CellSize, position.y / CellSize, position.z / CellSize);
-    return Cellposition.x + Dimensions * (Cellposition.y + Dimensions * Cellposition.z);
-}
-
-int Hash(int3 cell) {
-    return cell.x + Dimensions * (cell.y + Dimensions * cell.z);
-}
-
 struct Particle {
     float3 position;
     float4 Color;
 };
 
-RWStructuredBuffer<Particle> _particles;
-RWStructuredBuffer<int> _neighbourList;
-RWStructuredBuffer<int> _neighbourTracker;
-RWStructuredBuffer<uint> _hashGrid;
-RWStructuredBuffer<uint> _hashGridTracker;
-RWStructuredBuffer<float> _densities;
-RWStructuredBuffer<float> _pressures;
-RWStructuredBuffer<float3> _velocities;
-RWStructuredBuffer<float3> _forces;
-
-
+float CellSize;
+int Dimensions;
 int maximumParticlesPerCell;
 float radius;
 float radius2;
@@ -58,26 +33,28 @@ float epsilon;
 float pi;
 float stiffness;
 
-[numthreads(100, 1, 1)]
-void ClearHashGrid(uint3 id : SV_DispatchThreadID)
-{
-    _hashGridTracker[id.x] = 0;
+RWStructuredBuffer<Particle> _particles;
+RWStructuredBuffer<int> _neighbourList;
+RWStructuredBuffer<int> _neighbourTracker;
+RWStructuredBuffer<uint> _hashGrid;
+RWStructuredBuffer<uint> _hashGridTracker;
+RWStructuredBuffer<float> _densities;
+RWStructuredBuffer<float> _pressures;
+RWStructuredBuffer<float3> _velocities;
+RWStructuredBuffer<float3> _forces;
 
+// util functions
+int3 GetCell(float3 position) {
+    return int3(position.x / CellSize, position.y / CellSize, position.z / CellSize);
 }
-
-
-[numthreads(100, 1, 1)]
-void RecalculateHashGrid(uint3 id:SV_DispatchThreadID) {
-    int previousCount = 0;
-    const int hashCellIdx = Hash(GetCell(_particles[id.x].position));
-    InterlockedAdd(_hashGridTracker[hashCellIdx], 1, previousCount);
-    if (previousCount >= maximumParticlesPerCell)
-    {
-        return;
-    }
-    _hashGrid[hashCellIdx * maximumParticlesPerCell + previousCount] = id.x;
+int GetGridCellIndex(float3 position) {
+    int3 Cellposition = int3(position.x / CellSize, position.y / CellSize, position.z / CellSize);
+    return Cellposition.x + Dimensions * (Cellposition.y + Dimensions * Cellposition.z);
 }
-
+// hash: int3->int
+int Hash(int3 cell) {
+    return cell.x + Dimensions * (cell.y + Dimensions * cell.z);
+}
 void GetNearbyKeys(int3 originIndex, float3 position, out int nearbyKeys[8])
 {
     int3 nearbyBucketIndices[8];
@@ -92,9 +69,7 @@ void GetNearbyKeys(int3 originIndex, float3 position, out int nearbyKeys[8])
         nearbyBucketIndices[5].x += 1;
         nearbyBucketIndices[6].x += 1;
         nearbyBucketIndices[7].x += 1;
-
     }
-
     else
     {
         nearbyBucketIndices[4].x -= 1;
@@ -102,6 +77,7 @@ void GetNearbyKeys(int3 originIndex, float3 position, out int nearbyKeys[8])
         nearbyBucketIndices[6].x -= 1;
         nearbyBucketIndices[7].x -= 1;
     }
+
     if ((originIndex.y + 0.5f) * CellSize <= position.y) {
         nearbyBucketIndices[2].y += 1;
         nearbyBucketIndices[3].y += 1;
@@ -115,6 +91,7 @@ void GetNearbyKeys(int3 originIndex, float3 position, out int nearbyKeys[8])
         nearbyBucketIndices[6].y -= 1;
         nearbyBucketIndices[7].y -= 1;
     }
+
     if ((originIndex.z + 0.5f) * CellSize <= position.z) {
         nearbyBucketIndices[1].z += 1;
         nearbyBucketIndices[3].z += 1;
@@ -131,19 +108,59 @@ void GetNearbyKeys(int3 originIndex, float3 position, out int nearbyKeys[8])
 
     for (int j = 0; j < 8; j++) {
         int3 nbcellIndex = nearbyBucketIndices[j];
+        // check index in the dimension box
         if (nbcellIndex.x < 0 || nbcellIndex.x >= Dimensions || nbcellIndex.y < 0 || nbcellIndex.y >= Dimensions || nbcellIndex.z < 0 || nbcellIndex.z >= Dimensions) {
             nearbyKeys[j] = -1;
         }
         else {
-            nearbyKeys[j] = Hash(nearbyBucketIndices[j]);
+            nearbyKeys[j] = Hash(nearbyBucketIndices[j]); // output
         }
     }
+}
+
+// kernel functions
+float Wpoly6Kernel(float distanceSquared)
+{
+    float x = 1.0f - distanceSquared / radius2;
+    return 315.f / (64.f * pi * radius3) * x * x * x;
+}
+float SpikyKernelFirstDerivative(float distance)
+{
+    float x = 1.0f - distance / radius;
+    return -45.0f / (pi * radius4) * x * x;
+}
+float SpikyKernelSecondDerivative(float distance)
+{
+    float x = 1.0f - distance / radius;
+    return 90.0f / (pi * radius5) * x;
+}
+float3 SpikyKernelGradient(float distance, float3 directionFromCenter) {
+    return SpikyKernelFirstDerivative(distance) * directionFromCenter;
+}
+
+
+[numthreads(100, 1, 1)]
+void ClearHashGrid(uint3 id : SV_DispatchThreadID)
+{
+    _hashGridTracker[id.x] = 0;
+}
+
+[numthreads(100, 1, 1)]
+void RecalculateHashGrid(uint3 id:SV_DispatchThreadID) {
+    int previousCount = 0;
+    const int hashCellIdx = Hash(GetCell(_particles[id.x].position));
+    InterlockedAdd(_hashGridTracker[hashCellIdx], 1, previousCount);
+    if (previousCount >= maximumParticlesPerCell)
+    {
+        return;
+    }
+    _hashGrid[hashCellIdx * maximumParticlesPerCell + previousCount] = id.x;
 }
 
 [numthreads(100, 1, 1)]
 void BuildNeighbourList(uint3 id : SV_DispatchThreadID)
 {
-    _neighbourTracker[id.x] = 0;
+    _neighbourTracker[id.x] = 0; // reset track list
     const int3 cell = GetCell(_particles[id.x].position);
     int cells[8];
     GetNearbyKeys(cell, _particles[id.x].position, cells);
@@ -155,28 +172,22 @@ void BuildNeighbourList(uint3 id : SV_DispatchThreadID)
         for (uint index = 0; index < numberOfParticlesInCell; index++)
         {
             const uint potentialNeighbour = _hashGrid[cells[j] * maximumParticlesPerCell + index];
-            if (potentialNeighbour == id.x) continue;
-            const float3 v = _particles[potentialNeighbour].position - _particles[id.x].position;
-            if (dot(v, v) < radius2) // Use squared length (= dot) instead of length for performance.
+            if (potentialNeighbour == id.x) continue; // nei particle == this particle
+            const float3 v = _particles[potentialNeighbour].position - _particles[id.x].position; // this -> nei
+            
+            if (dot(v, v) < radius2)
             {
                 _neighbourList[id.x * maximumParticlesPerCell * 8 + _neighbourTracker[id.x]++] = potentialNeighbour;
             }
         }
     }
-    // n. The Neighbouring-list should be n-particles big, each index containing a list of each particles neighbours in radius r.
 }
 
-float Wpoly6Kernel(float distanceSquared)
-{
-    float x = 1.0f - distanceSquared / radius2;
-    return 315.f / (64.f * pi * radius3) * x * x * x;
-}
-
-[numthreads(100, 1, 1)]//合并
+[numthreads(100, 1, 1)]
 void ComputeDensityPressure(uint3 id :SV_DispatchThreadID)
 {
     float3 origin = _particles[id.x].position;
-    float sum = 0.f;
+    float sum = 0.0f;
     for (int j = 0; j < _neighbourTracker[id.x]; j++)
     {
         int neighbourIndex = _neighbourList[id.x * maximumParticlesPerCell * 8 + j];
@@ -204,28 +215,9 @@ void ComputeWCSPHDensityPressure(uint3 id :SV_DispatchThreadID)
         sum += Wpoly6Kernel(distanceSquared);
     }
 
-    _densities[id.x] = sum * mass + 0.000001f;
+    _densities[id.x] = sum * mass + epsilon;
     _densities[id.x] = max(restDensity, _densities[id.x]);
     _pressures[id.x] = stiffness * pow((_densities[id.x] / restDensity - 1), 7);
-
-}
-
-
-
-float SpikyKernelFirstDerivative(float distance)
-{
-    float x = 1.0f - distance / radius;
-    return -45.0f / (pi * radius4) * x * x;
-}
-
-float SpikyKernelSecondDerivative(float distance)
-{
-    float x = 1.0f - distance / radius;
-    return 90.0f / (pi * radius5) * x;
-}
-
-float3 SpikyKernelGradient(float distance, float3 directionFromCenter) {
-    return SpikyKernelFirstDerivative(distance) * directionFromCenter;
 }
 
 [numthreads(100, 1, 1)]
@@ -246,8 +238,6 @@ void ComputeForces(uint3 id :SV_DispatchThreadID) {
     _forces[id.x] += gravity;
 
 }
-
-
 
 [numthreads(100, 1, 1)]
 void Integrate(uint3 id :SV_DispatchThreadID)

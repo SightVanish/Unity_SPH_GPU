@@ -2,6 +2,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
+using System;
+using System.IO;
+using System.Text;
+using UnityEditor;
+using Random = UnityEngine.Random;
 
 struct Particle
 {
@@ -15,7 +20,7 @@ public class SPHManager : MonoBehaviour
     public ComputeShader computeShaderSPH;
 
     [Header("==== Particles Rendering ====")]
-    public float radius = 1f;
+    public float radius = 2f;
     public Mesh particleMesh;
     public float particleRenderSize = 1f;
     public Material particleMaterial;
@@ -104,6 +109,11 @@ public class SPHManager : MonoBehaviour
         computeShaderSPH.Dispatch(clearHashGridKernel, dimensions * dimensions * dimensions / 100, 1, 1);
         computeShaderSPH.Dispatch(recalculateHashGridKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(buildNeighbourListKernel, numberOfParticles / 100, 1, 1);
+
+        // debug
+        _neighbourTrackerBuffer.GetData(_neighbourTracker);
+        // WriteDatasToCsv();
+
         computeShaderSPH.Dispatch(computeDensityPressureKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(computeForcesKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(integrateKernel, numberOfParticles / 100, 1, 1);
@@ -114,24 +124,6 @@ public class SPHManager : MonoBehaviour
 
         Graphics.DrawMeshInstancedIndirect(particleMesh, 0, particleMaterial, new Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f)), _argsBuffer);
     }
-
-
-    private void OnDestroy()
-    {
-        // release buffers
-        _particlesBuffer.Dispose();
-        _argsBuffer.Dispose();
-        _neighbourListBuffer.Dispose();
-        _neighbourTrackerBuffer.Dispose();
-        _hashGridBuffer.Dispose();
-        _hashGridTrackerBuffer.Dispose();
-        _densitiesBuffer.Dispose();
-        _pressuresBuffer.Dispose();
-        _velocitiesBuffer.Dispose();
-        _forcesBuffer.Dispose();
-
-    }
-
 
     private void RespawnParticles()
     {
@@ -273,4 +265,41 @@ public class SPHManager : MonoBehaviour
         computeShaderSPH.SetBuffer(computeForcesKernel, "_forces", _forcesBuffer);
         computeShaderSPH.SetBuffer(integrateKernel, "_forces", _forcesBuffer);
     }
+
+    private void OnDestroy()
+    {
+        // release buffers
+        _particlesBuffer.Dispose();
+        _argsBuffer.Dispose();
+        _neighbourListBuffer.Dispose();
+        _neighbourTrackerBuffer.Dispose();
+        _hashGridBuffer.Dispose();
+        _hashGridTrackerBuffer.Dispose();
+        _densitiesBuffer.Dispose();
+        _pressuresBuffer.Dispose();
+        _velocitiesBuffer.Dispose();
+        _forcesBuffer.Dispose();
+
+    }
+
+    // output data to csv
+    public string path = @"F:\UnityGames\SPHGPU\data.csv";
+    
+    public void WriteDatasToCsv()
+    {
+        
+        if (!File.Exists(path))
+            File.Create(path).Close();
+
+        StreamWriter sw = new StreamWriter(path, true, Encoding.UTF8);
+        for (int i = 0; i< _neighbourTracker.Length; i++)
+        {
+            sw.Write(Convert.ToUInt32(_neighbourTracker[i]) + ",");
+        }
+        sw.Write("\r\n");
+
+        sw.Flush();
+        sw.Close();
+    }
+    
 }
