@@ -129,6 +129,7 @@ public class SPHManager : MonoBehaviour
     {
         float initParticleDensity = 1.5f;
         float initRandomOffset = 0.2f;
+        int particlePerRow = 50;
 
         _particles = new Particle[numberOfParticles];
         _densities = new float[numberOfParticles];
@@ -136,11 +137,11 @@ public class SPHManager : MonoBehaviour
         _velocities = new Vector3[numberOfParticles];
         _forces = new Vector3[numberOfParticles];
 
-        int particlesPerDimension = Mathf.CeilToInt(Mathf.Pow(numberOfParticles, 1f / 3f));
+        int particlesPerDimension = Mathf.CeilToInt(numberOfParticles/ particlePerRow/ particlePerRow);
         int count = 0;
-        for (int x = 0; x < particlesPerDimension; x++)
+        for (int x = 0; x < particlePerRow; x++)
             for (int y = 0; y < particlesPerDimension; y++)
-                for (int z = 0; z < particlesPerDimension; z++)
+                for (int z = 0; z < particlePerRow; z++)
                 {
                     Vector3 startPos = new Vector3(dimensions - 1, dimensions - 1, dimensions - 1)
                         - new Vector3(x / initParticleDensity, y / initParticleDensity, z / initParticleDensity) - new Vector3(Random.Range(0, initRandomOffset), Random.Range(0f, initRandomOffset), Random.Range(0f, initRandomOffset));

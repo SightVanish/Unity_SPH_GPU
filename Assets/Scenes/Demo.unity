@@ -198,8 +198,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 307563405}
-  m_LocalRotation: {x: -0.21748818, y: 0.45145407, z: -0.114465214, w: -0.8577796}
-  m_LocalPosition: {x: 98.99258, y: 68.98292, z: -22.942842}
+  m_LocalRotation: {x: -0.15515722, y: 0.38406584, z: -0.06564247, w: -0.90780544}
+  m_LocalPosition: {x: 111.386505, y: 54.786636, z: -37.494835}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -245,6 +245,49 @@ MonoBehaviour:
     m_RotationOrder: 4
   rotationLerpTime: 0.01
   invertY: 0
+--- !u!1 &838115685
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 838115687}
+  - component: {fileID: 838115686}
+  m_Layer: 0
+  m_Name: test
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &838115686
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 838115685}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb00eba6b5250a64c8c10bab9bbc2853, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!4 &838115687
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 838115685}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 3
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1382332114
 GameObject:
   m_ObjectHideFlags: 0
@@ -283,7 +326,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1382332114}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5a60d7aac1b298e459254441912af982, type: 3}
   m_Name: 
@@ -294,7 +337,7 @@ MonoBehaviour:
   particleRenderSize: 1
   particleMaterial: {fileID: 2100000, guid: 6747a84de8c99b349af0036f99f05856, type: 2}
   numberOfParticles: 80000
-  dimensions: 50
+  dimensions: 70
   stiffness: 0.2
   mass: 1
   gasConstant: 2000
@@ -303,6 +346,7 @@ MonoBehaviour:
   damping: -0.5
   dt: 0.01
   maximumParticlesPerCell: 200
+  path: F:\UnityGames\SPHGPU\data.csv
 --- !u!1 &1621113095
 GameObject:
   m_ObjectHideFlags: 0
