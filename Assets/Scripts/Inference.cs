@@ -22,7 +22,7 @@ public class Inference : MonoBehaviour
         var psi = new Process();
         psi.StartInfo.FileName = @"C:\Users\11054\anaconda3\envs\SPH\python.exe";
 
-        string script = @"F:\UnityGames\SPHGPU\inference.py";
+        string script = @"F:\UnityGames\SPHGPU\Pytorch_scripts\inference.py";
 
         psi.StartInfo.UseShellExecute = false;
         psi.StartInfo.CreateNoWindow = true;
@@ -35,9 +35,9 @@ public class Inference : MonoBehaviour
         psi.BeginOutputReadLine();
         psi.WaitForExit();
 
-        WriteDataToCSV(@"F:\UnityGames\SPHGPU\input.csv");
+        WriteDataToCSV(@"F:\UnityGames\SPHGPU\dataset\input.csv");
 
-        ReadCSVToData(@"F:\UnityGames\SPHGPU\output.csv");
+        ReadCSVToData(@"F:\UnityGames\SPHGPU\dataset\output.csv");
 
         foreach (var i in output_data)
             print(i);

@@ -7,6 +7,7 @@ using System.IO;
 using System.Text;
 using UnityEditor;
 using Random = UnityEngine.Random;
+using System.Diagnostics;
 
 struct Particle
 {
@@ -112,7 +113,7 @@ public class SPHManager : MonoBehaviour
 
         // debug
         _neighbourTrackerBuffer.GetData(_neighbourTracker);
-        // WriteDatasToCsv();
+        print(_neighbourTracker[100]);
 
         computeShaderSPH.Dispatch(computeDensityPressureKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(computeForcesKernel, numberOfParticles / 100, 1, 1);
@@ -283,24 +284,71 @@ public class SPHManager : MonoBehaviour
 
     }
 
-    // output data to csv
-    public string path = @"F:\UnityGames\SPHGPU\data.csv";
-    
-    public void WriteDatasToCsv()
+    private void Handle_python()
     {
-        
+
+        var psi = new Process();
+        psi.StartInfo.FileName = @"C:\Users\11054\anaconda3\envs\SPH\python.exe";
+
+        string script = @"F:\UnityGames\SPHGPU\Pytorch_scripts\inference.py";
+
+        psi.StartInfo.UseShellExecute = false;
+        psi.StartInfo.CreateNoWindow = true;
+        psi.StartInfo.Arguments = script;
+        psi.StartInfo.RedirectStandardError = true;
+        psi.StartInfo.RedirectStandardOutput = true;
+        psi.StartInfo.RedirectStandardInput = true;
+
+        psi.Start();
+        psi.BeginOutputReadLine();
+
+        psi.WaitForExit();
+
+        WriteDataToCSV(@"F:\UnityGames\SPHGPU\dataset\input.csv");
+
+        ReadCSVToData(@"F:\UnityGames\SPHGPU\dataset\output.csv");
+
+    }
+
+
+    public void WriteDataToCSV(string path)
+    {
         if (!File.Exists(path))
             File.Create(path).Close();
-
         StreamWriter sw = new StreamWriter(path, true, Encoding.UTF8);
-        for (int i = 0; i< _neighbourTracker.Length; i++)
+        // handle data
+
+        /*
+        for (int i = 0; i < input_data.Length; i++)
         {
-            sw.Write(Convert.ToUInt32(_neighbourTracker[i]) + ",");
+            sw.Write(input_data[i] + ",");
         }
-        sw.Write("\r\n");
+
+        sw.Write("\n");
+
+        */
 
         sw.Flush();
         sw.Close();
     }
-    
+
+    public void ReadCSVToData(string path)
+    {
+        string[] lines = File.ReadAllLines(path);
+        // handle data
+
+        /*
+        int i = 0;
+        foreach (string line in lines)
+        {
+            string[] columns = line.Split(',');
+            foreach (string column in columns)
+            {
+                output_data[i] = Convert.ToSingle(column);
+                i++;
+            }
+        }
+        */
+    }
+
 }
