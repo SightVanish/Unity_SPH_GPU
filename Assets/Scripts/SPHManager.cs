@@ -87,6 +87,8 @@ public class SPHManager : MonoBehaviour
     private int computeForcesKernel;
     private int integrateKernel;
 
+    private int save_interval = 10;
+    private int save_counter = 0;
 
     private void Awake()
     {
@@ -107,17 +109,59 @@ public class SPHManager : MonoBehaviour
     // do not use fixed update
     private void Update()
     {
+        Vector3[] pre_position = new Vector3[numberOfParticles];
+
         computeShaderSPH.Dispatch(clearHashGridKernel, dimensions * dimensions * dimensions / 100, 1, 1);
         computeShaderSPH.Dispatch(recalculateHashGridKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(buildNeighbourListKernel, numberOfParticles / 100, 1, 1);
-
-        // debug
-        _neighbourTrackerBuffer.GetData(_neighbourTracker);
-        print(_neighbourTracker[100]);
-
         computeShaderSPH.Dispatch(computeDensityPressureKernel, numberOfParticles / 100, 1, 1);
+
+      
+        if (save_counter < save_interval)
+        {
+            save_counter++;
+        }
+        else
+        {
+            save_counter = 0;
+
+            // get data
+            _particlesBuffer.GetData(_particles);
+            for (int i = 0; i < numberOfParticles; i++)
+            {
+                pre_position[i] = _particles[i].position; // vector3
+            }
+            _velocitiesBuffer.GetData(_velocities); // vector3
+            _forcesBuffer.GetData(_forces); // vector3
+            _pressuresBuffer.GetData(_pressures); // float
+            _densitiesBuffer.GetData(_densities); // float
+
+             // save data
+            for (int i = 0; i < numberOfParticles; i++)
+            {
+
+            }
+        }
+
+        
+
+
         computeShaderSPH.Dispatch(computeForcesKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(integrateKernel, numberOfParticles / 100, 1, 1);
+
+
+        if (save_counter < save_interval)
+        {
+            save_counter++;
+        }
+        else
+        {
+            save_counter = 0;
+
+            // get data
+            _densitiesBuffer.GetData(_densities); // float
+        }
+
 
         // material
         particleMaterial.SetFloat(SizeProperty, particleRenderSize);
@@ -162,6 +206,7 @@ public class SPHManager : MonoBehaviour
                     }
                 }
     }
+
     private void FindKernels()
     {
         clearHashGridKernel = computeShaderSPH.FindKernel("ClearHashGrid");
@@ -281,74 +326,6 @@ public class SPHManager : MonoBehaviour
         _pressuresBuffer.Dispose();
         _velocitiesBuffer.Dispose();
         _forcesBuffer.Dispose();
-
-    }
-
-    private void Handle_python()
-    {
-
-        var psi = new Process();
-        psi.StartInfo.FileName = @"C:\Users\11054\anaconda3\envs\SPH\python.exe";
-
-        string script = @"F:\UnityGames\SPHGPU\Pytorch_scripts\inference.py";
-
-        psi.StartInfo.UseShellExecute = false;
-        psi.StartInfo.CreateNoWindow = true;
-        psi.StartInfo.Arguments = script;
-        psi.StartInfo.RedirectStandardError = true;
-        psi.StartInfo.RedirectStandardOutput = true;
-        psi.StartInfo.RedirectStandardInput = true;
-
-        psi.Start();
-        psi.BeginOutputReadLine();
-
-        psi.WaitForExit();
-
-        WriteDataToCSV(@"F:\UnityGames\SPHGPU\dataset\input.csv");
-
-        ReadCSVToData(@"F:\UnityGames\SPHGPU\dataset\output.csv");
-
-    }
-
-
-    public void WriteDataToCSV(string path)
-    {
-        if (!File.Exists(path))
-            File.Create(path).Close();
-        StreamWriter sw = new StreamWriter(path, true, Encoding.UTF8);
-        // handle data
-
-        /*
-        for (int i = 0; i < input_data.Length; i++)
-        {
-            sw.Write(input_data[i] + ",");
-        }
-
-        sw.Write("\n");
-
-        */
-
-        sw.Flush();
-        sw.Close();
-    }
-
-    public void ReadCSVToData(string path)
-    {
-        string[] lines = File.ReadAllLines(path);
-        // handle data
-
-        /*
-        int i = 0;
-        foreach (string line in lines)
-        {
-            string[] columns = line.Split(',');
-            foreach (string column in columns)
-            {
-                output_data[i] = Convert.ToSingle(column);
-                i++;
-            }
-        }
-        */
     }
 
 }

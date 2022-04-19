@@ -1,12 +1,9 @@
-﻿
-
-#pragma kernel ClearHashGrid
+﻿#pragma kernel ClearHashGrid
 #pragma kernel RecalculateHashGrid
 #pragma kernel BuildNeighbourList
 #pragma kernel ComputeDensityPressure
 #pragma kernel ComputeForces
 #pragma kernel Integrate
-// #pragma enable_d3d11_debug_symbols
 
 struct Particle {
     float3 position;
@@ -138,7 +135,6 @@ float3 SpikyKernelGradient(float distance, float3 directionFromCenter) {
     return SpikyKernelFirstDerivative(distance) * directionFromCenter;
 }
 
-
 [numthreads(100, 1, 1)]
 void ClearHashGrid(uint3 id : SV_DispatchThreadID)
 {
@@ -202,24 +198,6 @@ void ComputeDensityPressure(uint3 id :SV_DispatchThreadID)
 
 }
 
-[numthreads(100, 1, 1)]//WithSmallSteps
-void ComputeWCSPHDensityPressure(uint3 id :SV_DispatchThreadID)
-{
-    float3 origin = _particles[id.x].position;
-    float sum = 0.f;
-    for (int j = 0; j < _neighbourTracker[id.x]; j++)
-    {
-        int neighbourIndex = _neighbourList[id.x * maximumParticlesPerCell * 8 + j];
-        const float3 diff = origin - _particles[neighbourIndex].position;
-        float distanceSquared = dot(diff, diff);
-        sum += Wpoly6Kernel(distanceSquared);
-    }
-
-    _densities[id.x] = sum * mass + epsilon;
-    _densities[id.x] = max(restDensity, _densities[id.x]);
-    _pressures[id.x] = stiffness * pow((_densities[id.x] / restDensity - 1), 7);
-}
-
 [numthreads(100, 1, 1)]
 void ComputeForces(uint3 id :SV_DispatchThreadID) {
     _forces[id.x] = float3(0, 0, 0);
@@ -249,12 +227,12 @@ void Integrate(uint3 id :SV_DispatchThreadID)
     _particles[id.x] = particle;
 
     float3 velocity = _velocities[id.x];
-    //Boundary
+
+    // handle collision
     if (_particles[id.x].position.x - epsilon < 0.0f)
     {
         velocity.x *= damping;
         particle.position.x = epsilon;
-
     }
     else if (_particles[id.x].position.x + epsilon > Dimensions - 1.f)
     {
@@ -265,7 +243,6 @@ void Integrate(uint3 id :SV_DispatchThreadID)
     {
         velocity.y *= damping;
         particle.position.y = epsilon;
-
     }
     else if (_particles[id.x].position.y + epsilon > Dimensions - 1.f)
     {
@@ -276,7 +253,6 @@ void Integrate(uint3 id :SV_DispatchThreadID)
     {
         velocity.z *= damping;
         particle.position.z = epsilon;
-
     }
     else if (_particles[id.x].position.z + epsilon > Dimensions - 1.f)
     {

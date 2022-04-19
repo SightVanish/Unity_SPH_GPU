@@ -6,12 +6,60 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System;
+using System.Runtime.Serialization.Formatters.Binary;
+
+struct MyData
+{
+    public float[] myData;
+}
 
 public class Inference : MonoBehaviour
 {
     float[] input_data;
     float[] output_data;
+
     private void Start()
+    {
+        input_data = new float[12];
+
+        LoadFromBin();
+
+        for (int i = 0; i < input_data.Length; i++)
+        {
+            // input_data[i] = 0.35f * (i+1);
+            print(input_data[i]);
+        }
+
+        // Save2Bin();
+    }
+
+    private void Save2Bin()
+    {
+        if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\input.bin"))
+        {
+            Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\input.bin");
+        }
+
+        float[] data = new float[10];
+        using FileStream saveFile = File.Create(@"d:\tmp\test.bin");
+
+        foreach (float f in data)
+        {
+            saveFile.Write(BitConverter.GetBytes(f), 0, sizeof(float));
+        }
+
+        saveFile.Flush();
+        saveFile.Close();
+    }
+    private void LoadFromBin()
+    {
+        BinaryFormatter formatter = new BinaryFormatter();
+        FileStream saveFile = File.Open(@"F:\UnityGames\SPHGPU\dataset\input.bin", FileMode.Open);
+        input_data = (float[])formatter.Deserialize(saveFile);
+        saveFile.Close();
+    }
+
+    private void CSVWrite()
     {
         input_data = new float[10];
         output_data = new float[10];
@@ -80,8 +128,6 @@ public class Inference : MonoBehaviour
             }
         }
     }
-
-
 
 
 }
