@@ -87,8 +87,8 @@ public class SPHManager : MonoBehaviour
     private int computeForcesKernel;
     private int integrateKernel;
 
-    private int save_interval = 10;
-    private int save_counter = 0;
+    private int save_interval = 100;
+    private int counter = 0;
 
     private void Awake()
     {
@@ -108,28 +108,24 @@ public class SPHManager : MonoBehaviour
         {
             Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\input.bin");
         }
+
+        FileStream saveFile = new FileStream(@"F:\UnityGames\SPHGPU\dataset\input.bin", FileMode.Create);
+        saveFile.Close();
     }
 
     // do not use fixed update
     private void Update()
     {
         Vector3[] pre_position = new Vector3[numberOfParticles];
-        using FileStream saveFile = File.Create(@"F:\UnityGames\SPHGPU\dataset\input.bin");
+        FileStream saveFile = new FileStream(@"F:\UnityGames\SPHGPU\dataset\input.bin", FileMode.Append);
+        var writer = new BinaryWriter(saveFile);
 
         computeShaderSPH.Dispatch(clearHashGridKernel, dimensions * dimensions * dimensions / 100, 1, 1);
         computeShaderSPH.Dispatch(recalculateHashGridKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(buildNeighbourListKernel, numberOfParticles / 100, 1, 1);
-        computeShaderSPH.Dispatch(computeDensityPressureKernel, numberOfParticles / 100, 1, 1);
 
-      
-        if (save_counter < save_interval)
+        if (counter > save_interval)
         {
-            save_counter++;
-        }
-        else
-        {
-            save_counter = 0;
-
             // get data
             _particlesBuffer.GetData(_particles);
             for (int i = 0; i < numberOfParticles; i++)
@@ -141,44 +137,45 @@ public class SPHManager : MonoBehaviour
             _pressuresBuffer.GetData(_pressures); // float
             _densitiesBuffer.GetData(_densities); // float
 
-             // save data
+            // save data
             for (int i = 0; i < numberOfParticles; i++)
             {
-                saveFile.Write(BitConverter.GetBytes(pre_position[i][0]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(pre_position[i][1]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(pre_position[i][2]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(_velocities[i][0]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(_velocities[i][1]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(_velocities[i][2]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(_forces[i][0]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(_forces[i][1]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(_forces[i][2]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(_pressures[i]), 0, sizeof(float));
-                saveFile.Write(BitConverter.GetBytes(_densities[i]), 0, sizeof(float));
+                writer.Write((float)pre_position[i][0]);
+                writer.Write((float)pre_position[i][1]);
+                writer.Write((float)pre_position[i][2]);
+                writer.Write((float)_velocities[i][0]);
+                writer.Write((float)_velocities[i][1]);
+                writer.Write((float)_velocities[i][2]);
+                writer.Write((float)_forces[i][0]);
+                writer.Write((float)_forces[i][1]);
+                writer.Write((float)_forces[i][2]);
+                writer.Write((float)_pressures[i]);
+                writer.Write((float)_densities[i]);
             }
-
-            saveFile.Flush();
-            saveFile.Close();
         }
 
-        
 
 
+        computeShaderSPH.Dispatch(computeDensityPressureKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(computeForcesKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(integrateKernel, numberOfParticles / 100, 1, 1);
 
-
-        if (save_counter < save_interval)
+        if (counter > save_interval)
         {
-            save_counter++;
-        }
-        else
-        {
-            save_counter = 0;
-
             // get data
             _densitiesBuffer.GetData(_densities); // float
+
+            // save data
+            for (int i = 0; i < numberOfParticles; i++)
+            {
+                writer.Write((float)_densities[i]);
+            }
         }
+
+        // close file
+        saveFile.Flush();
+        saveFile.Close();
+        counter++;
 
 
         // material

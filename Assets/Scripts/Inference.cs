@@ -18,7 +18,13 @@ public class Inference : MonoBehaviour
     float[] input_data;
     float[] output_data;
 
-    private void Start()
+
+    private void Awake()
+    {
+
+    }
+
+    private void WriteData()
     {
         input_data = new float[14];
 
