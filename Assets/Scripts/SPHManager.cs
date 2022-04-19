@@ -104,12 +104,17 @@ public class SPHManager : MonoBehaviour
         FindKernels();
         InitComputeBuffers();
 
+        if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\input.bin"))
+        {
+            Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\input.bin");
+        }
     }
 
     // do not use fixed update
     private void Update()
     {
         Vector3[] pre_position = new Vector3[numberOfParticles];
+        using FileStream saveFile = File.Create(@"F:\UnityGames\SPHGPU\dataset\input.bin");
 
         computeShaderSPH.Dispatch(clearHashGridKernel, dimensions * dimensions * dimensions / 100, 1, 1);
         computeShaderSPH.Dispatch(recalculateHashGridKernel, numberOfParticles / 100, 1, 1);
@@ -139,8 +144,21 @@ public class SPHManager : MonoBehaviour
              // save data
             for (int i = 0; i < numberOfParticles; i++)
             {
-
+                saveFile.Write(BitConverter.GetBytes(pre_position[i][0]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(pre_position[i][1]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(pre_position[i][2]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(_velocities[i][0]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(_velocities[i][1]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(_velocities[i][2]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(_forces[i][0]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(_forces[i][1]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(_forces[i][2]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(_pressures[i]), 0, sizeof(float));
+                saveFile.Write(BitConverter.GetBytes(_densities[i]), 0, sizeof(float));
             }
+
+            saveFile.Flush();
+            saveFile.Close();
         }
 
         
@@ -326,6 +344,28 @@ public class SPHManager : MonoBehaviour
         _pressuresBuffer.Dispose();
         _velocitiesBuffer.Dispose();
         _forcesBuffer.Dispose();
+
+
+
+    }
+
+    private void Save2Bin()
+    {
+        if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\input.bin"))
+        {
+            Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\input.bin");
+        }
+        using FileStream saveFile = File.Create(@"F:\UnityGames\SPHGPU\dataset\input.bin");
+
+        /*
+        foreach (float f in input_data)
+        {
+            saveFile.Write(BitConverter.GetBytes(f), 0, sizeof(float));
+        }
+        */
+
+        saveFile.Flush();
+        saveFile.Close();
     }
 
 }
