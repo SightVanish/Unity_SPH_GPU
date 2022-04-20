@@ -28,7 +28,9 @@ public class SPHManager : MonoBehaviour
 
     public int numberOfParticles = 2000;
     public int dimensions = 100;
-    
+    public int particlePerRow = 50;
+    public float initParticleDensity = 1.5f;
+
     [Header("==== Particle Properties ====")]
     public float stiffness = 0.2f;
     public float mass = 1f;
@@ -245,9 +247,7 @@ public class SPHManager : MonoBehaviour
 
     private void RespawnParticles()
     {
-        float initParticleDensity = 1.5f;
         float initRandomOffset = 0.2f;
-        int particlePerRow = 50;
 
         _particles = new Particle[numberOfParticles];
         _densities = new float[numberOfParticles];

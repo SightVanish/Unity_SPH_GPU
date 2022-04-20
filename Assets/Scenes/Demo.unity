@@ -200,8 +200,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 307563405}
-  m_LocalRotation: {x: -0.15515722, y: 0.38406584, z: -0.06564247, w: -0.90780544}
-  m_LocalPosition: {x: 111.386505, y: 54.786636, z: -37.494835}
+  m_LocalRotation: {x: 0.24437447, y: 0.414399, z: -0.116549246, w: 0.8688905}
+  m_LocalPosition: {x: -34.2315, y: 38.921253, z: -29.502485}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -273,14 +273,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1382332114}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0.2968074, y: 0.23030284, z: -0.0739946, w: 0.9237915}
+  m_LocalPosition: {x: -5.501632, y: 98.01164, z: -59.073524}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 2
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 16.743, y: -36.134, z: 0}
 --- !u!114 &1382332116
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -298,8 +298,10 @@ MonoBehaviour:
   particleMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
   particleRenderSize: 1
   particleMaterial: {fileID: 2100000, guid: 6747a84de8c99b349af0036f99f05856, type: 2}
-  numberOfParticles: 80000
-  dimensions: 70
+  numberOfParticles: 4000
+  dimensions: 30
+  particlePerRow: 20
+  initParticleDensity: 1.2
   stiffness: 0.2
   mass: 1
   gasConstant: 2000
