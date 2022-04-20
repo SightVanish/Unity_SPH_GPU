@@ -87,8 +87,14 @@ public class SPHManager : MonoBehaviour
     private int computeForcesKernel;
     private int integrateKernel;
 
-    private int save_interval = 100;
+    [Header("==== Collection Data ====")]
+    public bool save_data = true;
+    public bool delete_data = true;
+    public int save_interval = 5;
     private int counter = 0;
+    private int save_counter = 0;
+    
+    
 
     private void Awake()
     {
@@ -104,53 +110,94 @@ public class SPHManager : MonoBehaviour
         FindKernels();
         InitComputeBuffers();
 
-        if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\input.bin"))
+        if (delete_data)
         {
-            Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\input.bin");
+            if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\particle_properties.bin"))
+                Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\particle_properties.bin");
+
+            if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\neighbours_track.bin"))
+                Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\neighbours_track.bin");
+
+            if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\neighbours_list.bin"))
+                Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\neighbours_list.bin");
+
+            if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\densities.bin"))
+                Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\densities.bin");
+
+            FileStream saveFile = new FileStream(@"F:\UnityGames\SPHGPU\dataset\particle_properties.bin", FileMode.Create);
+            saveFile.Close();
+            FileStream saveFile1 = new FileStream(@"F:\UnityGames\SPHGPU\dataset\neighbours_track.bin", FileMode.Create);
+            saveFile1.Close();
+            FileStream saveFile2 = new FileStream(@"F:\UnityGames\SPHGPU\dataset\neighbours_list.bin", FileMode.Create);
+            saveFile2.Close();
+            FileStream saveFile3 = new FileStream(@"F:\UnityGames\SPHGPU\dataset\densities.bin", FileMode.Create);
+            saveFile3.Close();
         }
 
-        FileStream saveFile = new FileStream(@"F:\UnityGames\SPHGPU\dataset\input.bin", FileMode.Create);
-        saveFile.Close();
     }
 
     // do not use fixed update
     private void Update()
     {
+
         Vector3[] pre_position = new Vector3[numberOfParticles];
-        FileStream saveFile = new FileStream(@"F:\UnityGames\SPHGPU\dataset\input.bin", FileMode.Append);
+        FileStream saveFile = new FileStream(@"F:\UnityGames\SPHGPU\dataset\particle_properties.bin", FileMode.Append);
         var writer = new BinaryWriter(saveFile);
+        FileStream saveFile1 = new FileStream(@"F:\UnityGames\SPHGPU\dataset\neighbours_track.bin", FileMode.Append);
+        var writer1 = new BinaryWriter(saveFile1);
+        FileStream saveFile2 = new FileStream(@"F:\UnityGames\SPHGPU\dataset\neighbours_list.bin", FileMode.Append);
+        var writer2 = new BinaryWriter(saveFile2);
+        FileStream saveFile3 = new FileStream(@"F:\UnityGames\SPHGPU\dataset\densities.bin", FileMode.Append);
+        var writer3 = new BinaryWriter(saveFile3);
 
         computeShaderSPH.Dispatch(clearHashGridKernel, dimensions * dimensions * dimensions / 100, 1, 1);
         computeShaderSPH.Dispatch(recalculateHashGridKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(buildNeighbourListKernel, numberOfParticles / 100, 1, 1);
 
-        if (counter > save_interval)
-        {
-            // get data
-            _particlesBuffer.GetData(_particles);
-            for (int i = 0; i < numberOfParticles; i++)
-            {
-                pre_position[i] = _particles[i].position; // vector3
-            }
-            _velocitiesBuffer.GetData(_velocities); // vector3
-            _forcesBuffer.GetData(_forces); // vector3
-            _pressuresBuffer.GetData(_pressures); // float
-            _densitiesBuffer.GetData(_densities); // float
 
-            // save data
-            for (int i = 0; i < numberOfParticles; i++)
+        if (save_data)
+        {
+            if (counter > save_interval)
             {
-                writer.Write((float)pre_position[i][0]);
-                writer.Write((float)pre_position[i][1]);
-                writer.Write((float)pre_position[i][2]);
-                writer.Write((float)_velocities[i][0]);
-                writer.Write((float)_velocities[i][1]);
-                writer.Write((float)_velocities[i][2]);
-                writer.Write((float)_forces[i][0]);
-                writer.Write((float)_forces[i][1]);
-                writer.Write((float)_forces[i][2]);
-                writer.Write((float)_pressures[i]);
-                writer.Write((float)_densities[i]);
+                // particle_properties
+                _particlesBuffer.GetData(_particles);
+                for (int i = 0; i < numberOfParticles; i++)
+                {
+                    pre_position[i] = _particles[i].position; // vector3
+                }
+                _velocitiesBuffer.GetData(_velocities); // vector3
+                _forcesBuffer.GetData(_forces); // vector3
+                _pressuresBuffer.GetData(_pressures); // float
+                _densitiesBuffer.GetData(_densities); // float
+
+                for (int i = 0; i < numberOfParticles; i++)
+                {
+                    writer.Write((float)pre_position[i][0]);
+                    writer.Write((float)pre_position[i][1]);
+                    writer.Write((float)pre_position[i][2]);
+                    writer.Write((float)_velocities[i][0]);
+                    writer.Write((float)_velocities[i][1]);
+                    writer.Write((float)_velocities[i][2]);
+                    writer.Write((float)_forces[i][0]);
+                    writer.Write((float)_forces[i][1]);
+                    writer.Write((float)_forces[i][2]);
+                    writer.Write((float)_pressures[i]);
+                    writer.Write((float)_densities[i]);
+                }
+
+                // neighbours_track
+                _neighbourTrackerBuffer.GetData(_neighbourTracker); // int
+                for (int i = 0; i < numberOfParticles; i++)
+                    writer1.Write((Int16)_neighbourTracker[i]);
+
+                // neighbours_list
+                _neighbourListBuffer.GetData(_neighbourList); // int
+                for (int i = 0; i < numberOfParticles; i++)
+                {
+                    for (int j=0; j < _neighbourTracker[i]; j++)
+                    writer2.Write((Int16)_neighbourList[i*maximumParticlesPerCell*8 + j]);
+                }
+                
             }
         }
 
@@ -160,22 +207,33 @@ public class SPHManager : MonoBehaviour
         computeShaderSPH.Dispatch(computeForcesKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(integrateKernel, numberOfParticles / 100, 1, 1);
 
-        if (counter > save_interval)
+        if (save_data)
         {
-            // get data
-            _densitiesBuffer.GetData(_densities); // float
-
-            // save data
-            for (int i = 0; i < numberOfParticles; i++)
+            if (counter > save_interval)
             {
-                writer.Write((float)_densities[i]);
+                save_counter++;
+                counter = 0;
+
+                // densities
+                _densitiesBuffer.GetData(_densities); // float
+                for (int i = 0; i < numberOfParticles; i++)
+                {
+                    writer3.Write((float)_densities[i]);
+                }
             }
+            else
+                counter++;
         }
 
         // close file
         saveFile.Flush();
         saveFile.Close();
-        counter++;
+        saveFile1.Flush();
+        saveFile1.Close();
+        saveFile2.Flush();
+        saveFile2.Close();
+        saveFile3.Flush();
+        saveFile3.Close();
 
 
         // material
@@ -231,6 +289,7 @@ public class SPHManager : MonoBehaviour
         computeForcesKernel = computeShaderSPH.FindKernel("ComputeForces");
         integrateKernel = computeShaderSPH.FindKernel("Integrate");
     }
+    
     void InitComputeBuffers()
     {
         // set value
@@ -342,27 +401,8 @@ public class SPHManager : MonoBehaviour
         _velocitiesBuffer.Dispose();
         _forcesBuffer.Dispose();
 
+        print("Saved " + save_counter + " frames.");
 
-
-    }
-
-    private void Save2Bin()
-    {
-        if (Directory.Exists(@"F:\UnityGames\SPHGPU\dataset\input.bin"))
-        {
-            Directory.Delete(@"F:\UnityGames\SPHGPU\dataset\input.bin");
-        }
-        using FileStream saveFile = File.Create(@"F:\UnityGames\SPHGPU\dataset\input.bin");
-
-        /*
-        foreach (float f in input_data)
-        {
-            saveFile.Write(BitConverter.GetBytes(f), 0, sizeof(float));
-        }
-        */
-
-        saveFile.Flush();
-        saveFile.Close();
     }
 
 }

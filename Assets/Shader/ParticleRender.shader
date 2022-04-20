@@ -52,6 +52,7 @@
 
 				void surf(Input IN, inout SurfaceOutputStandard o) {
 					float4 col = float4(1, 1, 1, 1);
+
 					#ifdef UNITY_PROCEDURAL_INSTANCING_ENABLED
 					col = float4(_particlesBuffer[unity_InstanceID].position.x / 100 + 0.1,_particlesBuffer[unity_InstanceID].position.y / 100 + 0.1, _particlesBuffer[unity_InstanceID].position.z / 100 + 0.1,1);
 					#endif

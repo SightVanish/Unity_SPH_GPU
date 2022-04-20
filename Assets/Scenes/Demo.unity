@@ -308,6 +308,9 @@ MonoBehaviour:
   damping: -0.5
   dt: 0.01
   maximumParticlesPerCell: 200
+  save_data: 1
+  delete_data: 1
+  save_interval: 5
 --- !u!114 &1382332117
 MonoBehaviour:
   m_ObjectHideFlags: 0
