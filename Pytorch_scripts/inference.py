@@ -1,20 +1,29 @@
-import os
-import pandas as pd
-import torch
+import socket
+import time
 import numpy as np
+host, port = "127.0.0.1", 25001
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((host, port))
 
-def read_input():
-    """
-    Read input, to tensor.
-    """
-    input_file = "F:/UnityGames/SPHGPU/dataset/input.csv"
-    data = pd.read_csv(input_file, header=None)
-    data = np.array(data)
-    data = torch.tensor(data[:,:-1]) # the last column will be nan, just drop it
-    os.remove(input_file)
+# startPos = [0, 0, 0] #Vector3   x = 0, y = 0, z = 0
+# while True:
+#     time.sleep(0.5) #sleep 0.5 sec
+#     startPos[0] +=1 #increase x by one
+#     posString = ','.join(map(str, startPos)) #Converting Vector3 to a string, example "0,0,0"
+#     print(posString)
 
-def write_output():
-    output_file = "F:/UnityGames/SPHGPU/dataset/output.csv"
-    data = np.array(data)
-    data = pd.DataFrame(data)
-    data.to_csv(output_file, index=False, header=None)
+#     sock.sendall(posString.encode("UTF-8")) #Converting string to Byte, and sending it to C#
+#     receivedData = sock.recv(1024).decode("UTF-8") #receiveing data in Byte fron C#, and converting it to String
+#     print(receivedData)
+
+while True:
+    receivedData = sock.recv(1024)
+    y = np.frombuffer(receivedData, dtype=np.float32)
+    print(y)
+    y = y * 2
+    y = y.tobytes()
+    sock.sendall(y)
+    print(y)
+    print(np.frombuffer(y, dtype=np.float32))
+
+    exit()
