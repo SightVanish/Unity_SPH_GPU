@@ -58,6 +58,7 @@
   <ItemGroup>
     <Compile Include="Assets\Scripts\CameraController.cs" />
     <Compile Include="Assets\Scripts\SPHManager.cs" />
+    <Compile Include="Assets\Scripts\SocketFloat.cs" />
     <Compile Include="Assets\Scripts\Inference.cs" />
   </ItemGroup>
   <ItemGroup>

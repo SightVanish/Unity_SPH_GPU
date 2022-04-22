@@ -288,7 +288,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1382332114}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5a60d7aac1b298e459254441912af982, type: 3}
   m_Name: 
@@ -308,11 +308,17 @@ MonoBehaviour:
   restDensity: 2
   viscosityCoefficient: 1.2
   damping: -0.5
-  dt: 0.01
+  dt: 0.02
   maximumParticlesPerCell: 200
-  save_data: 1
-  delete_data: 1
+  save_data: 0
+  delete_data: 0
   save_interval: 5
+  inference: 0
+  use_python: 0
+  init_interval: 20
+  inference_interval: 1
+  connectionIP: 127.0.0.1
+  connectionPort: 25001
 --- !u!114 &1382332117
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -320,11 +326,15 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1382332114}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fb00eba6b5250a64c8c10bab9bbc2853, type: 3}
+  m_Script: {fileID: 11500000, guid: 5d1bcfb7b3910f04e840793abc36b08b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  ip: 127.0.0.1
+  port: 60000
+  dataOut: []
+  dataIn: []
 --- !u!1 &1621113095
 GameObject:
   m_ObjectHideFlags: 0

@@ -8,6 +8,10 @@ using System.Text;
 using UnityEditor;
 using Random = UnityEngine.Random;
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+using System.Linq;
 
 struct Particle
 {
@@ -95,12 +99,29 @@ public class SPHManager : MonoBehaviour
     public int save_interval = 5;
     private int counter = 0;
     private int save_counter = 0;
-    
-    
 
-    private void Awake()
+    [Header("==== Inference ====")]
+    public bool inference = true;
+    public bool use_python = false;
+    public int init_interval = 20;
+    private int init_counter = 0;
+    public int inference_interval = 5;
+    public string connectionIP = "127.0.0.1";
+    public int connectionPort = 25001;
+    private Thread mThread;
+    private IPAddress localAdd;
+    private TcpListener listener;
+    private TcpClient client;
+
+    public string ip = "127.0.0.1";
+    public int port = 60000;
+    private Socket socketClient;
+
+
+
+    private void Start()
     {
-        Application.targetFrameRate = 60;
+        Application.targetFrameRate = 30;
 
         radius2 = Mathf.Pow(radius, 2);
         radius3 = Mathf.Pow(radius, 3);
@@ -136,13 +157,46 @@ public class SPHManager : MonoBehaviour
             saveFile3.Close();
         }
 
+        if (inference)
+        {
+            localAdd = IPAddress.Parse(connectionIP);
+            listener = new TcpListener(IPAddress.Any, connectionPort);
+            listener.Start();
+
+            client = listener.AcceptTcpClient();
+        }
+        // print(Time.fixedDeltaTime);
     }
 
     // do not use fixed update
-    private void Update()
+    private void FixedUpdate()
     {
+        if (init_counter < init_interval)
+        {
+            init_counter++;
+            use_python = false;
+        }
+        else if (init_counter == init_interval)
+        {
+            // only trigger once
+            use_python = inference;
+            if (use_python)
+                print("Inference Started!");
+            init_counter++;
+        }
 
-        Vector3[] pre_position = new Vector3[numberOfParticles];
+        float[] receivedData = new float[numberOfParticles];
+
+        computeShaderSPH.Dispatch(clearHashGridKernel, dimensions * dimensions * dimensions / 100, 1, 1);
+        computeShaderSPH.Dispatch(recalculateHashGridKernel, numberOfParticles / 100, 1, 1);
+        computeShaderSPH.Dispatch(buildNeighbourListKernel, numberOfParticles / 100, 1, 1);
+
+        _densitiesBuffer.GetData(_densities);
+
+        // float[] receiveData = SendAndReceive(_densities, _densities.Length);
+        // print(receiveData.Length);
+
+        /*
         FileStream saveFile = new FileStream(@"F:\UnityGames\SPHGPU\dataset\particle_properties.bin", FileMode.Append);
         var writer = new BinaryWriter(saveFile);
         FileStream saveFile1 = new FileStream(@"F:\UnityGames\SPHGPU\dataset\neighbours_track.bin", FileMode.Append);
@@ -152,21 +206,13 @@ public class SPHManager : MonoBehaviour
         FileStream saveFile3 = new FileStream(@"F:\UnityGames\SPHGPU\dataset\densities.bin", FileMode.Append);
         var writer3 = new BinaryWriter(saveFile3);
 
-        computeShaderSPH.Dispatch(clearHashGridKernel, dimensions * dimensions * dimensions / 100, 1, 1);
-        computeShaderSPH.Dispatch(recalculateHashGridKernel, numberOfParticles / 100, 1, 1);
-        computeShaderSPH.Dispatch(buildNeighbourListKernel, numberOfParticles / 100, 1, 1);
-
-
         if (save_data)
         {
             if (counter > save_interval)
             {
                 // particle_properties
                 _particlesBuffer.GetData(_particles);
-                for (int i = 0; i < numberOfParticles; i++)
-                {
-                    pre_position[i] = _particles[i].position; // vector3
-                }
+
                 _velocitiesBuffer.GetData(_velocities); // vector3
                 _forcesBuffer.GetData(_forces); // vector3
                 _pressuresBuffer.GetData(_pressures); // float
@@ -174,19 +220,18 @@ public class SPHManager : MonoBehaviour
 
                 for (int i = 0; i < numberOfParticles; i++)
                 {
-                    writer.Write((float)pre_position[i][0]);
-                    writer.Write((float)pre_position[i][1]);
-                    writer.Write((float)pre_position[i][2]);
-                    writer.Write((float)_velocities[i][0]);
-                    writer.Write((float)_velocities[i][1]);
-                    writer.Write((float)_velocities[i][2]);
-                    writer.Write((float)_forces[i][0]);
-                    writer.Write((float)_forces[i][1]);
-                    writer.Write((float)_forces[i][2]);
+                    writer.Write((float)_particles[i].position.x);
+                    writer.Write((float)_particles[i].position.y);
+                    writer.Write((float)_particles[i].position.z);
+                    writer.Write((float)_velocities[i].x);
+                    writer.Write((float)_velocities[i].y);
+                    writer.Write((float)_velocities[i].z);
+                    writer.Write((float)_forces[i].x);
+                    writer.Write((float)_forces[i].y);
+                    writer.Write((float)_forces[i].z);
                     writer.Write((float)_pressures[i]);
                     writer.Write((float)_densities[i]);
                 }
-
                 // neighbours_track
                 _neighbourTrackerBuffer.GetData(_neighbourTracker); // int
                 for (int i = 0; i < numberOfParticles; i++)
@@ -202,13 +247,146 @@ public class SPHManager : MonoBehaviour
                 
             }
         }
+        */
 
+
+        if (use_python)
+        {
+            // particle_properties
+            _particlesBuffer.GetData(_particles); // particles -> position vector3
+            _velocitiesBuffer.GetData(_velocities); // vector3
+            _forcesBuffer.GetData(_forces); // vector3
+            _pressuresBuffer.GetData(_pressures); // float
+            _densitiesBuffer.GetData(_densities); // float
+
+            // send data
+            NetworkStream nwStream = client.GetStream();
+
+            /*
+            // send float
+            float[] sendData = new float[numberOfParticles * 11];
+            print("send float length: " + sendData.Length*4);
+
+            for (int i = 0; i < numberOfParticles; i++)
+            {
+                sendData[i * 11 + 0] = (float)_particles[i].position.x;
+                sendData[i * 11 + 1] = (float)_particles[i].position.y;
+                sendData[i * 11 + 2] = (float)_particles[i].position.z;
+
+                sendData[i * 11 + 3] = (float)_velocities[i].x;
+                sendData[i * 11 + 4] = (float)_velocities[i].y;
+                sendData[i * 11 + 5] = (float)_velocities[i].z;
+
+                sendData[i * 11 + 6] = (float)_forces[i].x;
+                sendData[i * 11 + 7] = (float)_forces[i].y;
+                sendData[i * 11 + 8] = (float)_forces[i].z;
+
+                sendData[i * 11 + 9] = (float)_pressures[i];
+                sendData[i * 11 + 10] = (float)_densities[i];
+            }
+
+            byte[] byteArray = new byte[sendData.Length * 4];
+
+            Buffer.BlockCopy(sendData, 0, byteArray, 0, byteArray.Length);
+
+            print("send bytes length: " + byteArray.Length);
+
+            nwStream.Write(byteArray, 0, byteArray.Length);
+            */
+
+            // send float--test
+            float[] sendData = new float[11];
+            byte[] byteArray = new byte[11 * 4];
+            for (int i = 0; i < numberOfParticles; i++)
+            {
+                sendData[0] = (float)_particles[i].position.x;
+                sendData[1] = (float)_particles[i].position.y;
+                sendData[2] = (float)_particles[i].position.z;
+                sendData[3] = (float)_velocities[i].x;
+                sendData[4] = (float)_velocities[i].y;
+                sendData[5] = (float)_velocities[i].z;
+                sendData[6] = (float)_forces[i].x;
+                sendData[7] = (float)_forces[i].y;
+                sendData[8] = (float)_forces[i].z;
+                sendData[9] = (float)_pressures[i];
+                sendData[10] = (float)_densities[i];
+
+                Buffer.BlockCopy(sendData, 0, byteArray, 0, byteArray.Length);
+
+                nwStream.Write(byteArray, 0, byteArray.Length);
+            }
+
+            /*
+            // send int 2
+            _neighbourTrackerBuffer.GetData(_neighbourTracker); // int
+            byteArray = new byte[_neighbourTracker.Length * 4];
+            Buffer.BlockCopy(_neighbourTracker, 0, byteArray, 0, byteArray.Length);
+            nwStream.Write(byteArray, 0, byteArray.Length);
+
+            
+            // send int 3
+            int[] sendDataInt = new int[_neighbourTracker.Sum()];
+            _neighbourListBuffer.GetData(_neighbourList); // int
+            int k = 0;
+            for (int i = 0; i < numberOfParticles; i++)
+            {
+                for (int j = 0; j < _neighbourList[i]; j++)
+                {
+                    sendDataInt[k] = _neighbourList[i * maximumParticlesPerCell * 8 + j];
+                    k++;
+                }
+            }
+            byteArray = new byte[sendDataInt.Length * 4];
+            Buffer.BlockCopy(sendDataInt, 0, byteArray, 0, byteArray.Length);
+            nwStream.Write(byteArray, 0, byteArray.Length);
+            */
+            // send int 3--test
+            _neighbourListBuffer.GetData(_neighbourList); // int
+
+            byteArray = new byte[_neighbourList.Length * 4];
+            Buffer.BlockCopy(_neighbourList, 0, byteArray, 0, byteArray.Length);
+            nwStream.Write(byteArray, 0, byteArray.Length);
+
+
+            /*
+            // receive data
+            receivedData = new float[numberOfParticles];
+            byte[] buffer = new byte[client.ReceiveBufferSize];
+            int bytesRead = nwStream.Read(buffer, 0, client.ReceiveBufferSize);
+
+            for (int i = 0; i < numberOfParticles; i++)
+            {
+                receivedData[i] = BitConverter.ToSingle(buffer, i*4);
+            }
+            // print(receivedData.Length);
+            */
+
+            // receive data--test
+            receivedData = new float[2];
+            byte[] buffer = new byte[client.ReceiveBufferSize];
+            int bytesRead = nwStream.Read(buffer, 0, client.ReceiveBufferSize);
+
+            receivedData[0] = BitConverter.ToSingle(buffer, 0);
+            receivedData[1] = BitConverter.ToSingle(buffer, 1);
+        }
 
 
         computeShaderSPH.Dispatch(computeDensityPressureKernel, numberOfParticles / 100, 1, 1);
+
+
+        if (use_python)
+        {
+
+            // set buffer
+            // _densitiesBuffer.SetData(receivedData);
+            // computeShaderSPH.SetBuffer(computeForcesKernel, "_densities", _densitiesBuffer);
+            
+        }
+
         computeShaderSPH.Dispatch(computeForcesKernel, numberOfParticles / 100, 1, 1);
         computeShaderSPH.Dispatch(integrateKernel, numberOfParticles / 100, 1, 1);
 
+        /*
         if (save_data)
         {
             if (counter > save_interval)
@@ -236,13 +414,15 @@ public class SPHManager : MonoBehaviour
         saveFile2.Close();
         saveFile3.Flush();
         saveFile3.Close();
-
+        */
 
         // material
         particleMaterial.SetFloat(SizeProperty, particleRenderSize);
         particleMaterial.SetBuffer(ParticlesBufferProperty, _particlesBuffer);
 
         Graphics.DrawMeshInstancedIndirect(particleMesh, 0, particleMaterial, new Bounds(Vector3.zero, new Vector3(100.0f, 100.0f, 100.0f)), _argsBuffer);
+
+        print("num of frames ->");
     }
 
     private void RespawnParticles()
@@ -387,6 +567,43 @@ public class SPHManager : MonoBehaviour
         computeShaderSPH.SetBuffer(integrateKernel, "_forces", _forcesBuffer);
     }
 
+    private int Int16Sum(Int16[] data)
+    {
+        int sum = 0;
+        foreach (var i in data)
+            sum += i;
+        return sum;
+    }
+
+    private float[] ServerRequest(float[] dataOut, int receiveLength)
+    {
+        float[] dataIn = SendAndReceive(dataOut, receiveLength);
+        return dataIn;
+    }
+
+    private float[] SendAndReceive(float[] dataOut, int receiveLength)
+    {
+        //initialize socket
+        float[] floatsReceived;
+        socketClient = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        socketClient.Connect(ip, port);
+
+        var byteArray = new byte[dataOut.Length * 4];
+        Buffer.BlockCopy(dataOut, 0, byteArray, 0, byteArray.Length);
+        socketClient.Send(byteArray);
+
+        //allocate and receive bytes
+        byte[] bytes = new byte[receiveLength * 4];
+        int idxUsedBytes = socketClient.Receive(bytes);
+
+        //convert bytes to floats
+        floatsReceived = new float[idxUsedBytes / 4];
+        Buffer.BlockCopy(bytes, 0, floatsReceived, 0, idxUsedBytes);
+
+        client.Close();
+        return floatsReceived;
+    }
+
     private void OnDestroy()
     {
         // release buffers
@@ -401,8 +618,11 @@ public class SPHManager : MonoBehaviour
         _velocitiesBuffer.Dispose();
         _forcesBuffer.Dispose();
 
-        print("Saved " + save_counter + " frames.");
+        if (save_data)
+            print("Saved " + save_counter + " frames.");
 
+        if (inference)
+            listener.Stop();
     }
 
 }
